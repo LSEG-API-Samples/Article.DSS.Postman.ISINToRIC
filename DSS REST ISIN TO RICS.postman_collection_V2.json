@@ -1,0 +1,330 @@
+{
+    "info": {
+        "_postman_id": "8f495249-d098-bf02-8bbe-e918b5f5bcd2",
+        "name": "DSS REST ISIN TO RICS",
+        "description": "This collection complements the following article:\n\nConverting ISINs to RICs using the DSS REST API",
+        "schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "1: User authentication",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Prefer",
+                        "value": "respond-async"
+                    },
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\r\n  \"Credentials\": {\r\n    \"Username\": {{dss-user}},\r\n    \"Password\": {{dss-password}}\r\n  }\r\n}"
+                },
+                "url": "{{protocol}}{{host}}{{api}}Authentication/RequestToken",
+                "description": "Very first query, to request the authentication token (valid 24 hours).\n\nPre-requisites:\n1) Install the DSS REST ISIN TO RICS Postman environment.\n2) Set the \"dss-user\" and \"dss-password\" environment variables to a valid DSS account.\n\nTo run subsequent requests:\n1) Copy the received token value into the \"authorization\" environment variable."
+            },
+            "response": []
+        },
+        {
+            "name": "2. Find primary exchange for an ISIN",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Prefer",
+                        "value": "respond-async"
+                    },
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    },
+                    {
+                        "key": "Authorization",
+                        "value": "Token {{authorization}}"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\r\n  \"InputsForValidation\": [\r\n    { \"Identifier\": \"US4592001014\", \"IdentifierType\": \"Isin\" },\r\n    { \"Identifier\": \"GB00B29MWZ99\", \"IdentifierType\": \"Isin\" },\r\n    { \"Identifier\": \"DE000C0JK7R7\", \"IdentifierType\": \"Isin\" },\r\n    { \"Identifier\": \"DE0001135317\", \"IdentifierType\": \"Isin\" }\r\n  ],\r\n  \"Options\": {\r\n    \"AllowDuplicateInstruments\": false,\r\n    \"AllowHistoricalInstruments\": true,\r\n    \"AllowInactiveInstruments\": true,\r\n    \"AllowOpenAccessInstruments\": false,\r\n    \"AllowUnsupportedInstruments\": false,\r\n    \"ExcludeFinrAsPricingSourceForBonds\": false,\r\n    \"UseConsolidatedQuoteSourceForCanada\": false,\r\n    \"UseConsolidatedQuoteSourceForUsa\": false,\r\n    \"UseDebtOverEquity\": false,\r\n    \"UseExchangeCodeInsteadOfLipper\": false,\r\n    \"UseUsQuoteInsteadOfCanadian\": false\r\n  }\r\n}"
+                },
+                "url": "{{protocol}}{{host}}{{api}}Extractions/InstrumentListValidateIdentifiersWithOptions",
+                "description": "A call to InstrumentListValidateWithOptions delivers for each input ISIN the primary exchange.\r\n\r\nA single call suffices for multiple ISINs.\r\n\r\nThe response contains an object ValidatedInstruments, array that contains several objects (one for each input ISIN) containing the fields we are interested in: Identifier and Source.\r\n\r\nResults: parsing the response allows us to build a list of ISINs and corresponding primary exchange codes.\r\n\r\n\r\nNotes:\r\n1) The request body contains a number of options. If you want matured and delisted instruments you must set \"AllowInactiveInstruments\": true.\r\n\r\n2) To validate historical instruments you must also set \"AllowHistoricalInstruments\": true."
+            },
+            "response": []
+        },
+        {
+            "name": "3a: Find (primary) RIC for ISIN: list fields for T&C",
+            "request": {
+                "method": "GET",
+                "header": [
+                    {
+                        "key": "Prefer",
+                        "value": "respond-async"
+                    },
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    },
+                    {
+                        "key": "Authorization",
+                        "value": "Token {{authorization}}"
+                    }
+                ],
+                "body": {
+                    "mode": "formdata",
+                    "formdata": []
+                },
+                "url": "{{protocol}}{{host}}{{api}}Extractions/GetValidContentFieldTypes(ReportTemplateType=DataScope.Select.Api.Extractions.ReportTemplates.ReportTemplateTypes'TermsAndConditions')",
+                "description": "Request the entire list of available fields for a Terms & Conditions request.\r\n\r\nThis is just to understand what fields are available, it is not a pre-requisite to the following calls.\r\n\r\nInteresting fields are: \"RIC\", \"ISIN\", Currency Code\", \"Exchange Code\", \"Exchange Code List\""
+            },
+            "response": []
+        },
+        {
+            "name": "3b: Find (primary) RIC for ISIN: request T&C",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Prefer",
+                        "value": "respond-async"
+                    },
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    },
+                    {
+                        "key": "Authorization",
+                        "value": "Token {{authorization}}"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\r\n  \"ExtractionRequest\": {\r\n    \"@odata.type\": \"#DataScope.Select.Api.Extractions.ExtractionRequests.TermsAndConditionsExtractionRequest\",\r\n    \"ContentFieldNames\": [ \r\n      \"RIC\", \"ISIN\", \"Currency Code\", \"Exchange Code\", \"Exchange Code List\"\r\n    ],\r\n    \"IdentifierList\": {\r\n      \"@odata.type\": \"#DataScope.Select.Api.Extractions.ExtractionRequests.InstrumentIdentifierList\",\r\n      \"InstrumentIdentifiers\": [\r\n        { \"Identifier\": \"US4592001014\", \"IdentifierType\": \"Isin\", \"Source\": \"PSE\" },\r\n        { \"Identifier\": \"US4592001014\", \"IdentifierType\": \"Isin\", \"Source\": \"SWX\" },\r\n        { \"Identifier\": \"US4592001014\", \"IdentifierType\": \"Isin\" },\r\n        { \"Identifier\": \"GB00B29MWZ99\", \"IdentifierType\": \"Isin\" },\r\n        { \"Identifier\": \"DE000C0JK7R7\", \"IdentifierType\": \"Isin\" },\r\n        { \"Identifier\": \"DE0001135317\", \"IdentifierType\": \"Isin\" }\r\n      ],\r\n      \"ValidationOptions\": {\r\n        \"AllowHistoricalInstruments\": true,\r\n        \"AllowInactiveInstruments\": true,\r\n        \"AllowOpenAccessInstruments\": false\r\n      },\r\n      \"UseUserPreferencesForValidationOptions\": false\r\n    }\r\n  }\r\n}"
+                },
+                "url": "{{protocol}}{{host}}{{api}}Extractions/ExtractWithNotes",
+                "description": "A TermsAndConditionsExtractionRequest delivers for each input ISIN and source (exchange) the corresponding RIC.\n\nIf the source is not mentioned, the result defaults to the primary RIC.\n\nIf you want results for several exchanges, you need one entry per source.\n\nIt is also possible to retrieve the currency and exchange code.\n\nA single call suffices for multiple ISINs.\n\n\nThe request might timeout.\nIf there was a timeout:\nThe response status will be 202 (Accepted), and the body will not contain data. Instead, the response header will contain a \"Location\" URL.\nCopy that URL to environment variable \"locationUrl\", and then run the next request 3c, to retrieve the data from that URL."
+            },
+            "response": []
+        },
+        {
+            "name": "3c: Find (primary) RIC for ISIN: request data after timeout",
+            "request": {
+                "method": "GET",
+                "header": [
+                    {
+                        "key": "Prefer",
+                        "value": "respond-async"
+                    },
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    },
+                    {
+                        "key": "Authorization",
+                        "value": "Token {{authorization}}"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\r\n  \"ExtractionRequest\": {\r\n    \"@odata.type\": \"#DataScope.Select.Api.Extractions.ExtractionRequests.EndOfDayPricingExtractionRequest\",\r\n    \"ContentFieldNames\": [\r\n      \"Ask Price\",\r\n      \"Asset Category\",\r\n      \"Asset Category Description\",\r\n      \"Asset ID\",\r\n      \"Asset Status\",\r\n      \"Asset Status Description\",\r\n      \"Asset SubType\",\r\n      \"Asset SubType Description\",\r\n      \"Asset Type\",\r\n      \"Asset Type Description\",\r\n      \"Bid Price\",\r\n      \"Block Trades\",\r\n      \"CIN Code\",\r\n      \"Common Code\",\r\n      \"Currency Code\",\r\n      \"Currency Code Description\",\r\n      \"Currency Code Scaled\",\r\n      \"Currency Code Scaled Description\",\r\n      \"CUSIP\",\r\n      \"Exchange Code\",\r\n      \"Exchange Description\",\r\n      \"Exercise Style\",\r\n      \"Expiration Date\",\r\n      \"File Code\",\r\n      \"High Price\",\r\n      \"Instrument ID\",\r\n      \"Instrument ID Type\",\r\n      \"ISIN\",\r\n      \"Issuer OrgID\",\r\n      \"Lot Size\",\r\n      \"Low Price\",\r\n      \"Market MIC\",\r\n      \"MIC\",\r\n      \"Mid Price\",\r\n      \"Net Asset Value\",\r\n      \"Number of Price Moves\",\r\n      \"Offer Price\",\r\n      \"Official Close Price\",\r\n      \"Open Price\",\r\n      \"Previous Close Price\",\r\n      \"Put Call Indicator\",\r\n      \"Quote ID\",\r\n      \"RCP ID\",\r\n      \"RIC\",\r\n      \"Security Description\",\r\n      \"SEDOL\",\r\n      \"Settlement Date\",\r\n      \"Settlement Price\",\r\n      \"SICC\",\r\n      \"Sicovam\",\r\n      \"Strike Price\",\r\n      \"Ticker\",\r\n      \"Trade Date\",\r\n      \"Trading Status\",\r\n      \"Trading Symbol\",\r\n      \"Turnover\",\r\n      \"Underlying RIC\",\r\n      \"Universal Ask Price\",\r\n      \"Universal Bid Ask Date\",\r\n      \"Universal Bid Price\",\r\n      \"Universal Close Price\",\r\n      \"Usage Instrument SubType\",\r\n      \"Usage Instrument Type\",\r\n      \"Valoren\",\r\n      \"Volume\",\r\n      \"VWAP Price\",\r\n      \"Wertpapier\"\r\n    ],\r\n    \"IdentifierList\": {\r\n      \"@odata.type\": \"#DataScope.Select.Api.Extractions.ExtractionRequests.InstrumentIdentifierList\",\r\n      \"InstrumentIdentifiers\": [{\r\n        \"Identifier\": \"438516AC0\",\r\n        \"IdentifierType\": \"Cusip\"\r\n      },{\r\n        \"Identifier\": \"IBM.N\",\r\n        \"IdentifierType\": \"Ric\"\r\n      }]\r\n    },\r\n    \"Condition\": null\r\n  }\r\n}"
+                },
+                "url": "{{locationUrl}}",
+                "description": "Request terms and conditions data, after a timeout (due to a large amount of data).\n\nPre-requisites:\n1) Run request 3b.\n2) If it timed out, copy the value of the \"Location\" from the response header into the \"locationUrl\" environment variable.\n\nNotes:\n1) If the data is not yet available, the response will be the same as that of request 3b.\n2) Once data has been returned by this call, subsequent requests to the location URL will fail."
+            },
+            "response": []
+        },
+        {
+            "name": "4a: Find RICs for ISIN",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Prefer",
+                        "value": "respond-async"
+                    },
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    },
+                    {
+                        "key": "Authorization",
+                        "value": "Token {{authorization}}"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\r\n  \"SearchRequest\": {\r\n    \"InstrumentTypeGroups\": [\r\n      \"CollatetizedMortgageObligations\", \"Commodities\", \"Equities\", \"Funds\",\r\n      \"FuturesAndOptions\", \"GovCorp\", \"Money\", \"MortgageBackedSecurities\",\r\n      \"Municipals\"\r\n    ],\r\n    \"IdentifierType\": \"Isin\",\r\n    \"Identifier\": \"US4592001014\",\r\n    \"PreferredIdentifierType\": \"Ric\"\r\n  }\r\n}"
+                },
+                "url": "{{protocol}}{{host}}{{api}}Search/InstrumentSearch",
+                "description": "The family of Search requests delivers for an input ISIN all RICs and corresponding exchanges, from the results you can select those for exchanges of interest.\r\n\r\nOne needs to run one call per ISIN.\r\n\r\nThe various search requests have different filtering capabilities.\r\n\r\nInstrumentSearch is the generic search; it allows filtering by instrument type.\r\n\r\nThis allows you to find the RICs for specific exchanges.\r\n\r\nThe set of fields that are returned in the response is not configurable.\r\n\r\nFor each result it is recommended to check the value of field IdentifierType, because in cases where a RIC is not available a different identifier type might be returned.\r\n\r\nNo RICs are delivered if the instrument is no longer quoted."
+            },
+            "response": []
+        },
+        {
+            "name": "4b: Find Equity RICs for ISIN",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Prefer",
+                        "value": "respond-async"
+                    },
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    },
+                    {
+                        "key": "Authorization",
+                        "value": "Token {{authorization}}"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\r\n  \"SearchRequest\": {\r\n    \"AssetStatus\": \"Active\",\r\n    \"AssetCategoryCodes\": null,\r\n    \"SubTypeCodes\": null,\r\n    \"CurrencyCodes\": [ \"USD\" ],\r\n    \"CompanyName\": null,\r\n    \"Description\": null,\r\n    \"DomicileCodes\": null,\r\n    \"ExchangeCodes\": [ \"NAS\", \"NYS\", \"GSM\", \"NSM\", \"SWX\" ],\r\n    \"FairValueIndicator\": null,\r\n    \"FileCodes\": null,\r\n    \"GicsCodes\": null,\r\n    \"OrgId\": null,\r\n    \"Ticker\": null,\r\n    \"Identifier\": \"US4592001014\",\r\n    \"IdentifierType\": \"Isin\",\r\n    \"PreferredIdentifierType\": \"Ric\"\r\n  }\r\n}"
+                },
+                "url": "{{protocol}}{{host}}{{api}}Search/EquitySearch",
+                "description": "The family of Search requests delivers for an input ISIN all RICs and corresponding exchanges, from the results you can select those for exchanges of interest.\r\n\r\nOne needs to run one call per ISIN.\r\n\r\nThe various search requests have different filtering capabilities.\r\n\r\nEquitySearch allows filtering by 1 currency and/or several exchanges.\r\n\r\nThis allows you to find the RICs for specific exchanges.\r\n\r\nThe set of fields that are returned in the response is not configurable.\r\n\r\nFor each result it is recommended to check the value of field IdentifierType, because in cases where a RIC is not available a different identifier type might be returned.\r\n\r\nNo RICs are delivered if the instrument is no longer quoted."
+            },
+            "response": []
+        },
+        {
+            "name": "4c: Find Future or Option RICs for ISIN",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Prefer",
+                        "value": "respond-async"
+                    },
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    },
+                    {
+                        "key": "Authorization",
+                        "value": "Token {{authorization}}"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\r\n  \"SearchRequest\": {\r\n    \"FileCodes\": null,\r\n    \"CurrencyCodes\": [ \"EUR\" ],\r\n    \"ExchangeCodes\": [ \"EUX\", \"DTB\" ],\r\n    \"StrikePrice\": null,\r\n    \"ExpirationDate\": {\r\n      \"@odata.type\": \"#DataScope.Select.Api.Search.DateValueComparison\",\r\n      \"ComparisonOperator\": \"GreaterThanEquals\",\r\n      \"Value\": \"2016-12-31T00:00:00.000Z\"\r\n    },\r\n    \"IdentifierType\": \"Isin\",\r\n    \"Identifier\": \"DE000C0JK7R7\",\r\n    \"PreferredIdentifierType\": \"Ric\",\r\n    \"UnderlyingRic\": null\r\n  }\r\n}"
+                },
+                "url": "{{protocol}}{{host}}{{api}}Search/FuturesAndOptionsSearch",
+                "description": "The family of Search requests delivers for an input ISIN all RICs and corresponding exchanges, from the results you can select those for exchanges of interest.\r\n\r\nOne needs to run one call per ISIN.\r\n\r\nThe various search requests have different filtering capabilities.\r\n\r\nFuturesAndOptionsSearch allows filtering by a combination of 1 currency, several exchanges, expiration date and/or strike price.\r\n\r\nThis allows you to find the RICs for specific exchanges.\r\n\r\nThe set of fields that are returned in the response is not configurable.\r\n\r\nFor each result it is recommended to check the value of field IdentifierType, because in cases where a RIC is not available a different identifier type might be returned.\r\n\r\nNo RICs are delivered if the instrument is no longer quoted."
+            },
+            "response": []
+        },
+        {
+            "name": "4d: Find Bond RICs for ISIN",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Prefer",
+                        "value": "respond-async"
+                    },
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    },
+                    {
+                        "key": "Authorization",
+                        "value": "Token {{authorization}}"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\r\n  \"SearchRequest\": {\r\n    \"AssetStatuses\": [\"CLD\", \"CAN\", \"DFS\", \"RDM\", \"EXC\", \"MAT\", \"FNG\", \"DEF\", \"ISS\", \"LIQ\", \"NAC\", \"PRE\", \"PUT\", \"RPN\", \"RMK\", \"RBM\", \"FDD\", \"REP\", \"RES\", \"TEN\", \"TBC\", \"TBE\", \"TBI\", \"TBP\", \"TBR\", \"TBB\", \"WHN\"],\r\n    \"Coupon\": null,\r\n    \"CurrencyCodes\": [ \"EUR\", \"USD\" ],\r\n    \"Group\": { \"Agency\": true, \"Government\": true, \"Corporate\": true, \"Supra\": true },\r\n    \"MoodyRatingsCodes\": null,\r\n    \"StandardPoorsRatingsCodes\": null,\r\n    \"Callable\": false,\r\n    \"Convertable\": false,\r\n    \"Extendable\": false,\r\n    \"Putable\": false,\r\n    \"Sinkable\": false,\r\n    \"IssueDate\": null,\r\n    \"MaturityDate\": null,\r\n    \"NextPayDate\": null,\r\n    \"Identifier\": \"DE0001135317\",\r\n    \"IdentifierType\": \"Isin\",\r\n    \"PreferredIdentifierType\": \"Ric\"\r\n  }\r\n}"
+                },
+                "url": "{{protocol}}{{host}}{{api}}Search/GovCorpSearch",
+                "description": "The family of Search requests delivers for an input ISIN all RICs and corresponding exchanges, from the results you can select those for exchanges of interest.\r\n\r\nOne needs to run one call per ISIN.\r\n\r\nThe various search requests have different filtering capabilities.\r\n\r\nGovCorpSearch allows filtering by a combination of asset statuses (where matured is MAT), several currencies, dates and more.\r\n\r\nThis allows you to find the RICs for specific exchanges.\r\n\r\nThe set of fields that are returned in the response is not configurable.\r\n\r\nFor each result it is recommended to check the value of field IdentifierType, because in cases where a RIC is not available a different identifier type might be returned.\r\n\r\nNo RICs are delivered if the instrument is no longer quoted."
+            },
+            "response": []
+        },
+        {
+            "name": "5a: List available fields for EoD",
+            "request": {
+                "method": "GET",
+                "header": [
+                    {
+                        "key": "Prefer",
+                        "value": "respond-async"
+                    },
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    },
+                    {
+                        "key": "Authorization",
+                        "value": "Token {{authorization}}"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\r\n  \"Credentials\": {\r\n    \"Username\": {{dss-user}},\r\n    \"Password\": {{dss-password}}\r\n  }\r\n}"
+                },
+                "url": "{{protocol}}{{host}}{{api}}Extractions/GetValidContentFieldTypes(ReportTemplateType=DataScope.Select.Api.Extractions.ReportTemplates.ReportTemplateTypes'EndOfDayPricing')",
+                "description": "Request the entire list of available fields for an End of Day request. The parameter passed in the URL is 'EndOfDayPricing'.\n\nThis is just to understand what fields are available, it is not a pre-requisite to the following calls."
+            },
+            "response": []
+        },
+        {
+            "name": "5b: Request EoD data using ISINs",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Prefer",
+                        "value": "respond-async"
+                    },
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    },
+                    {
+                        "key": "Authorization",
+                        "value": "Token {{authorization}}"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\r\n  \"ExtractionRequest\": {\r\n    \"@odata.type\": \"#DataScope.Select.Api.Extractions.ExtractionRequests.EndOfDayPricingExtractionRequest\",\r\n    \"ContentFieldNames\": [\r\n      \"ISIN\", \"RIC\", \"Underlying RIC\", \"Trading Status\", \"Asset Status\",\r\n      \"Currency Code\", \"Exchange Code\", \"Expiration Date\",\r\n      \"Trade Date\", \"Open Price\", \"High Price\", \"Low Price\", \"Close Price\", \"Volume\"\r\n    ],\r\n    \"IdentifierList\": {\r\n      \"@odata.type\": \"#DataScope.Select.Api.Extractions.ExtractionRequests.InstrumentIdentifierList\",\r\n      \"InstrumentIdentifiers\": [\r\n        { \"Identifier\": \"US4592001014\", \"IdentifierType\": \"Isin\", \"Source\": \"PSE\" },\r\n        { \"Identifier\": \"US4592001014\", \"IdentifierType\": \"Isin\", \"Source\": \"SWX\" },\r\n        { \"Identifier\": \"US4592001014\", \"IdentifierType\": \"Isin\" },\r\n        { \"Identifier\": \"GB00B29MWZ99\", \"IdentifierType\": \"Isin\" },\r\n        { \"Identifier\": \"DE000C0JK7R7\", \"IdentifierType\": \"Isin\" },\r\n        { \"Identifier\": \"DE0001135317\", \"IdentifierType\": \"Isin\" }],\r\n      \"ValidationOptions\": { \"AllowHistoricalInstruments\": true },\r\n      \"UseUserPreferencesForValidationOptions\": false\r\n    },\r\n    \"Condition\": null\r\n  }\r\n}"
+                },
+                "url": "{{protocol}}{{host}}{{api}}Extractions/ExtractWithNotes",
+                "description": "It is possible to run a data extraction using ISINs, and optional source (exchange).\n\nIf the source is not mentioned, the result defaults to the primary RIC only.\n\nIf you want results for several exchanges, you need one entry per source.\n\nTo see the details of the ISIN to RIC mapping you can include the following fields in the request: RIC, ISIN, Currency Code, and Exchange Code.\n\nWe do not recommend adding static data (like exchange and currency) to the output field list, because this data will be delivered for every single output record, resulting in slower processing due to useless duplication and information treatment.\n\nOne data extraction call can handle many ISINs.\n\nThe request might timeout. If there was a timeout: The response status will be 202 (Accepted), and the body will not contain data. Instead, the response header will contain a \"Location\" URL. Copy that URL to environment variable \"locationUrl\", and then run the next request 5c, to retrieve the data from that URL."
+            },
+            "response": []
+        },
+        {
+            "name": "5c: Request Eod data after timeout",
+            "request": {
+                "method": "GET",
+                "header": [
+                    {
+                        "key": "Prefer",
+                        "value": "respond-async"
+                    },
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    },
+                    {
+                        "key": "Authorization",
+                        "value": "Token {{authorization}}"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\r\n  \"ExtractionRequest\": {\r\n    \"@odata.type\": \"#DataScope.Select.Api.Extractions.ExtractionRequests.EndOfDayPricingExtractionRequest\",\r\n    \"ContentFieldNames\": [\r\n      \"Ask Price\",\r\n      \"Asset Category\",\r\n      \"Asset Category Description\",\r\n      \"Asset ID\",\r\n      \"Asset Status\",\r\n      \"Asset Status Description\",\r\n      \"Asset SubType\",\r\n      \"Asset SubType Description\",\r\n      \"Asset Type\",\r\n      \"Asset Type Description\",\r\n      \"Bid Price\",\r\n      \"Block Trades\",\r\n      \"CIN Code\",\r\n      \"Common Code\",\r\n      \"Currency Code\",\r\n      \"Currency Code Description\",\r\n      \"Currency Code Scaled\",\r\n      \"Currency Code Scaled Description\",\r\n      \"CUSIP\",\r\n      \"Exchange Code\",\r\n      \"Exchange Description\",\r\n      \"Exercise Style\",\r\n      \"Expiration Date\",\r\n      \"File Code\",\r\n      \"High Price\",\r\n      \"Instrument ID\",\r\n      \"Instrument ID Type\",\r\n      \"ISIN\",\r\n      \"Issuer OrgID\",\r\n      \"Lot Size\",\r\n      \"Low Price\",\r\n      \"Market MIC\",\r\n      \"MIC\",\r\n      \"Mid Price\",\r\n      \"Net Asset Value\",\r\n      \"Number of Price Moves\",\r\n      \"Offer Price\",\r\n      \"Official Close Price\",\r\n      \"Open Price\",\r\n      \"Previous Close Price\",\r\n      \"Put Call Indicator\",\r\n      \"Quote ID\",\r\n      \"RCP ID\",\r\n      \"RIC\",\r\n      \"Security Description\",\r\n      \"SEDOL\",\r\n      \"Settlement Date\",\r\n      \"Settlement Price\",\r\n      \"SICC\",\r\n      \"Sicovam\",\r\n      \"Strike Price\",\r\n      \"Ticker\",\r\n      \"Trade Date\",\r\n      \"Trading Status\",\r\n      \"Trading Symbol\",\r\n      \"Turnover\",\r\n      \"Underlying RIC\",\r\n      \"Universal Ask Price\",\r\n      \"Universal Bid Ask Date\",\r\n      \"Universal Bid Price\",\r\n      \"Universal Close Price\",\r\n      \"Usage Instrument SubType\",\r\n      \"Usage Instrument Type\",\r\n      \"Valoren\",\r\n      \"Volume\",\r\n      \"VWAP Price\",\r\n      \"Wertpapier\"\r\n    ],\r\n    \"IdentifierList\": {\r\n      \"@odata.type\": \"#DataScope.Select.Api.Extractions.ExtractionRequests.InstrumentIdentifierList\",\r\n      \"InstrumentIdentifiers\": [{\r\n        \"Identifier\": \"438516AC0\",\r\n        \"IdentifierType\": \"Cusip\"\r\n      },{\r\n        \"Identifier\": \"IBM.N\",\r\n        \"IdentifierType\": \"Ric\"\r\n      }]\r\n    },\r\n    \"Condition\": null\r\n  }\r\n}"
+                },
+                "url": "{{locationUrl}}",
+                "description": "Request End of Day data, after a timeout.\n\nPre-requisites:\n1) Run 5b: Request Eod data\n2) Copy the value of the \"Location\" from the response header into the \"locationUrl\" environment variable.\n\nNotes:\n1) If the data is still not available, the response will be the same as that of request 5b.\n2) Once data has been returned by this call, subsequent requests to the location URL will fail.\n"
+            },
+            "response": []
+        }
+    ]
+}
